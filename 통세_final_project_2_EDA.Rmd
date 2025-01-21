@@ -1,0 +1,1156 @@
+---
+output:
+  word_document: default
+  html_document: default
+---
+##women breast cancer: diagnostic
+```{r}
+library(GGally)
+bc_d=read.csv("C:/Temp/data/wisconson/wdbc.data", 
+              header=TRUE)
+
+dim(bc_d)
+
+head(bc_d)
+
+colnames(bc_d) = c("ID", "Diagnosis", 
+                   "Radius_mean", "Texture_mean", "Parameter_mean", "Area_mean", "Smoothness_mean",
+                   "Compactness_mean", "Concavity_mean", "Concave_points_mean", "Symmetry_mean", "Fraction_dimension_mean",
+                   "Radius_se", "Texture_se", "Parameter_se", "Area_se", "Smoothness_se",
+                   "Compactness_se", "Concavity_se", "Concave_points_se", "Symmetry_se", "Fraction_dimension_se",
+                   "Radius_worst", "Texture_worst", "Parameter_worst", "Area_worst", "Smoothness_worst",
+                   "Compactness_worst", "Concavity_worst", "Concave_points_worst", "Symmetry_worst", "Fraction_dimension_worst")
+
+head(bc_d)
+#diagnosis: M(악성), B(양성)
+bc_d$Diagnosis = as.factor(bc_d$Diagnosis)
+```
+
+##################################################################
+#                 EDA
+##################################################################
+```{r}
+attach(bc_d)
+```
+
+###################### mean ###############################
+```{r}
+boxplot(Radius_mean, Texture_mean, Parameter_mean, Area_mean, Smoothness_mean,
+        Compactness_mean, Concavity_mean, Concave_points_mean, Symmetry_mean, Fraction_dimension_mean,
+        main="boxplot of mean variables")
+View(summary(bc_d[,3:12]))
+
+boxplot(bc_d[,3:12])  #area is bigger compared to the others
+
+boxplot(bc_d[,c(3:5, 7:12)])  #Parameter is also big
+#lets compare smootheness~fraction
+
+boxplot(bc_d[,7:12], main="boxplot of smootheness~fractions")
+#The mean data of smootheness~fractions seems to have different standard error.
+
+#radius~texture
+boxplot(bc_d[,3:4], main='boxplot of radius & texture' )
+#radius mean is smaller than texure
+
+ggpairs(bc_d, columns = 3:12, 
+        aes(color=Diagnosis, alpha=0.5), main="GGpairs of Mean Variables")
+```
+######################standard error
+```{r}
+ggpairs(bc_d, columns=13:22, 
+        aes(color=Diagnosis, alpha=0.5), main="GGpairs of Standard Error Variables")
+
+boxplot(bc_d[,13:22], main="boxplot of standard error variables")
+#it seems that area has the biggest standard error as well (probably cause of the 단위)
+
+boxplot(bc_d[,13:14], main='boxplot of radius & texture')
+#radius se is smaller than texture
+
+
+boxplot(bc_d[,17:22], main="boxplot of smootheness~fractions")
+
+
+summary(bc_d[,13:22])
+```
+#paraeter se and are se seems to have big difference compared to the other se's
+#Thus, it would be good to do standardization and make a new variable of standardized __.
+
+
+
+#################Standardization(3~12 & 13~22)
+```{r}
+as.matrix(bc_d[,3:12])
+
+as.matrix(bc_d[,3:12]) - apply(as.matrix(bc_d[,3:12]), 2, mean)
+
+
+bc_std = c()
+for (i in 3:12){
+  bc_std = cbind(bc_std, (as.matrix(bc_d[,i]) - apply(as.matrix(bc_d[,i]), 2, mean))/apply(as.matrix(bc_d[,i+10]), 2, mean))
+}
+
+colnames(bc_std) = c("Radius_std", "Texture_std", "Parameter_std", "Area_std", "Smoothness_std",
+                     "Compactness_std", "Concavity_std", "Concave_points_std", "Symmetry_std", "Fraction_dimension_std")
+head(bc_std)
+```
+############# EDA ################
+```{r}
+boxplot(bc_std,main="boxplot of Std. Method2")
+#much better
+#the mean is near 0(cause it is std)
+
+bc_std = as.data.frame(bc_std)
+
+
+###EDA 추가
+library(ggplot2)
+ggplot(bc_std, aes(Radius_std)) + geom_histogram()
+
+library(GGally)
+
+bc_std$Diagnosis = Diagnosis
+ggpairs(bc_std, columns=1:10, 
+        aes(color=Diagnosis, alpha=0.5), main="GGpairs of Standard Error Variables")
+
+ggscatmat(bc_std, color = "Diagnosis")
+```
+#it seems that  radius&parameter has high corr
+#radius & area also has high corr
+#paramete & area also has high corr
+#concavity & concave points also have high corr
+#a) radius (mean of distances from center to points on the perimeter)
+#b) texture (standard deviation of gray-scale values), maybe the value of the histogram of the ultrasound image?(픽셀값의 편차)
+#c) parimeter(둘레)
+#d) area(부피)
+#g) concavity (severity of concave portions of the contour)
+#h) concave points (number of concave portions of the contour)
+
+```{r}
+head(bc_std)
+
+ggpairs(bc_std, columns = 1:10, aes(color=Diagnosis, alpha=0.5))
+```
+#It seems that the two clusters(Diagnosis) are easy to differentiate
+#Thus, the two diagnosed patients have difference in their status.
+#the only variable that are kinda hard to differentiate are 
+#texture&fractal dimension / texture&symmetry / smootheness &symmetry / smoothness & fracture dimension
+#For the variables, it seems that smoothness , fractal dimensions, symmetry is quite simiar between variabless
+
+
+###################different way of standardizing (by each obs s.e)#######################
+```{r}
+bc_std2 = c()
+sum(bc_d[,13:22]==0)
+#26
+
+sum(bc_d[,19]==0)
+#13
+for (i in 1:nrow(bc_d)){
+ bc_d[i,19] = ifelse(bc_d[i,19] == 0, 1, bc_d[i,19] )
+}
+sum(bc_d[,19]==0)
+
+
+sum(bc_d[,20]==0)
+#13
+for (i in 1:nrow(bc_d)){
+  bc_d[i,20] = ifelse(bc_d[i,20] == 0, 1, bc_d[i,20] )
+}
+sum(bc_d[,20]==0)
+
+sum(bc_d[,13:22]==0)
+##0
+```
+
+
+```{r}
+for (i in 3:12){
+    bc_std2  = cbind(bc_std2, (as.matrix(bc_d[,i]) - apply(as.matrix(bc_d[,i]), 2, mean))/as.matrix(bc_d[,i+10])) 
+}
+
+colnames(bc_std2) = c("Radius_std", "Texture_std", "Parameter_std", "Area_std", "Smoothness_std",
+                     "Compactness_std", "Concavity_std", "Concave_points_std", "Symmetry_std", "Fraction_dimension_std")
+head(bc_std2)
+bc_std2 = as.data.frame(bc_std2)
+bc_std2$Diagnosis = Diagnosis
+
+barplot(table(Diagnosis), main="Diagnosis Barplot", col=c("red", "blue")) 
+```
+#those who are 양성(B) are almost 1.7 times more than those who are 악성(M)
+```{r}
+ggpairs(bc_std2, columns =1:10, aes(color=Diagnosis, apha=0.5))
+#This graph shows that red(B양성) are clearly more than blue(M,음성)
+ggpairs(bc_d, columns = 3:12, aes(color=Diagnosis, alpha=0.5))
+```
+#This is different than the origial data, where blue and red seems half and half.
+#Thus, it seems that bc_std2 seems more accurate to use
+
+
+```{r}
+summary(bc_std2)
+boxplot(bc_std2, main="boxplot of Std. Method 2")
+#the standardization looks good
+cov(bc_std2[,1:10])
+```
+
+###Question: 어떤 std를 선택해야 할지 모르겠음. 
+#현재 판단으로는 std2가 더 나아보임.
+
+
+######################## Worst ###########################
+```{r}
+ggpairs(bc_d, columns = 23:32, aes(color=Diagnosis, apha=0.5))
+#the plots seems similar to the standardized dataset
+#lets use the worst for ourselves
+
+summary(bc_d[,23:32])
+summary(bc_std)
+
+bc.wst_std = as.matrix(scale(bc_d[,23:32]))
+head(bc.wst_std)
+```
+#very different from bc_std...
+#What should we do?!?!?! 차라리 s.e.를 적용하는 것이 좋을듯.
+
+```{r}
+bc.wst_std = c()
+for (i in 3:12){
+  bc.wst_std  = cbind(bc.wst_std , (as.matrix(bc_d[,i+20]) - apply(as.matrix(bc_d[,i+20]), 2, mean))/apply(as.matrix(bc_d[,i+10]), 2, mean))
+}
+colnames(bc.wst_std) = c("Radius_std", "Texture_std", "Parameter_std", "Area_std", "Smoothness_std",
+                         "Compactness_std", "Concavity_std", "Concave_points_std", "Symmetry_std", "Fraction_dimension_std")
+
+head(bc.wst_std )
+summary(bc.wst_std)
+bc.wst_std = as.data.frame(bc.wst_std)
+bc.wst_std$Diagnosis = Diagnosis
+
+par(mfrow=c(2,2))
+boxplot(bc.wst_std, main="Worst Case's Standardization Method1")
+ggpairs(bc.wst_std, columns =1:10, aes(color=Diagnosis, apha=0.5))
+```
+#same issue with bc_std and bc_std2....
+#even though in reality B(양성, red) is more than M, the graph shows differnyly
+#what if we used the same method as bc_std2?
+
+
+####bc.wst_std2
+```{r}
+bc.wst_std2 =c()
+for (i in 3:12){
+  bc.wst_std2   = cbind(bc.wst_std2 , 
+                        (as.matrix(bc_d[,i+20]) - apply(as.matrix(bc_d[,i+20]), 2, mean))/as.matrix(bc_d[,i+10])) 
+}
+
+colnames(bc.wst_std2) = c("Radius_std", "Texture_std", "Parameter_std", "Area_std", "Smoothness_std",
+                      "Compactness_std", "Concavity_std", "Concave_points_std", "Symmetry_std", "Fraction_dimension_std")
+head(bc.wst_std2)
+bc.wst_std2 = as.data.frame(bc.wst_std2)
+bc.wst_std2$Diagnosis = Diagnosis
+
+
+boxplot(bc.wst_std2, main="Worst Case's Standardization Method2")
+ggpairs(bc.wst_std2, columns =1:10, aes(color=Diagnosis, apha=0.5))
+```
+
+
+####################################################################
+#           EDA (Std1)
+##################################################################
+```{r}
+ggplot(bc.wst_std, aes(Radius_std, fill=Diagnosis, alpha=0.5)) + geom_density()
+
+ggplot(bc.wst_std, aes(Texture_std, fill=Diagnosis, alpha=0.5)) + geom_density()
+
+ggplot(bc.wst_std, aes(Parameter_std, fill=Diagnosis, alpha=0.5)) + geom_density()
+
+ggplot(bc.wst_std, aes(Area_std, fill=Diagnosis, alpha=0.5)) + geom_density()
+
+ggplot(bc.wst_std, aes(Smoothness_std, fill=Diagnosis, alpha=0.5)) + geom_density()
+
+
+ggplot(bc.wst_std, aes(Compactness_std, fill=Diagnosis, alpha=0.5)) + geom_density()
+
+ggplot(bc.wst_std, aes(Concavity_std, fill=Diagnosis, alpha=0.5)) + geom_density()
+
+ggplot(bc.wst_std, aes(Concave_points_std, fill=Diagnosis, alpha=0.5)) + geom_density()
+
+ggplot(bc.wst_std, aes(Symmetry_std, fill=Diagnosis, alpha=0.5)) + geom_density()
+
+ggplot(bc.wst_std, aes( Fraction_dimension_std, fill=Diagnosis, alpha=0.5)) + geom_density()
+```
+
+
+```{r}
+ggplot(bc_std, aes(Radius_std, fill=Diagnosis, alpha=0.5)) + geom_density()
+
+ggplot(bc_std, aes(Texture_std, fill=Diagnosis, alpha=0.5)) + geom_density()
+
+ggplot(bc_std, aes(Parameter_std, fill=Diagnosis, alpha=0.5)) + geom_density()
+
+ggplot(bc_std, aes(Area_std, fill=Diagnosis, alpha=0.5)) + geom_density()
+
+ggplot(bc_std, aes(Smoothness_std, fill=Diagnosis, alpha=0.5)) + geom_density()
+
+
+ggplot(bc_std, aes(Compactness_std, fill=Diagnosis, alpha=0.5)) + geom_density()
+
+ggplot(bc_std, aes(Concavity_std, fill=Diagnosis, alpha=0.5)) + geom_density()
+
+ggplot(bc_std, aes(Concave_points_std, fill=Diagnosis, alpha=0.5)) + geom_density()
+
+ggplot(bc_std, aes(Symmetry_std, fill=Diagnosis, alpha=0.5)) + geom_density()
+
+ggplot(bc_std, aes( Fraction_dimension_std, fill=Diagnosis, alpha=0.5)) + geom_density()
+```
+
+
+
+
+####boxplot
+```{r}
+ggplot(bc_std, aes(Diagnosis, Radius_std)) + geom_boxplot()
+
+ggplot(bc_std, aes(Diagnosis, Texture_std)) + geom_boxplot()
+
+ggplot(bc_std, aes(Diagnosis, Parameter_std)) + geom_boxplot()
+
+ggplot(bc_std, aes(Diagnosis, Area_std)) + geom_boxplot()
+
+ggplot(bc_std, aes(Diagnosis, Smoothness_std)) + geom_boxplot()
+
+ggplot(bc_std, aes(Diagnosis, Compactness_std)) + geom_boxplot()
+
+ggplot(bc_std, aes(Diagnosis,Concavity_std)) + geom_boxplot()
+
+ggplot(bc_std, aes(Diagnosis,Concave_points_std)) + geom_boxplot()
+
+ggplot(bc_std, aes(Diagnosis,Symmetry_std)) + geom_boxplot()
+
+ggplot(bc_std, aes(Diagnosis,Fraction_dimension_std)) + geom_boxplot()
+
+```
+
+
+
+```{r}
+ggplot(bc.wst_std, aes(Diagnosis, Radius_std)) + geom_boxplot()
+
+ggplot(bc.wst_std, aes(Diagnosis, Texture_std)) + geom_boxplot()
+
+ggplot(bc.wst_std, aes(Diagnosis, Parameter_std)) + geom_boxplot()
+
+ggplot(bc.wst_std, aes(Diagnosis, Area_std)) + geom_boxplot()
+
+ggplot(bc.wst_std, aes(Diagnosis, Smoothness_std)) + geom_boxplot()
+
+ggplot(bc.wst_std, aes(Diagnosis, Compactness_std)) + geom_boxplot()
+
+ggplot(bc.wst_std, aes(Diagnosis,Concavity_std)) + geom_boxplot()
+
+ggplot(bc.wst_std, aes(Diagnosis,Concave_points_std)) + geom_boxplot()
+
+ggplot(bc.wst_std, aes(Diagnosis,Symmetry_std)) + geom_boxplot()
+
+ggplot(bc.wst_std, aes(Diagnosis,Fraction_dimension_std)) + geom_boxplot()
+```
+
+
+################################################################################
+#                            PCA
+################################################################################
+```{r}
+bc.final = cbind(bc_d[,1:2], bc_std[1:10], bc.wst_std[1:10])
+dim(bc.final); sum(is.na(bc.final))
+#총 22개의 변수
+
+library(mulgar)
+library(ggplot2)
+bc_pca = prcomp(bc.final[,-c(1:2)])
+bc_scree = ggscree(bc_pca, q=5) + theme_minimal()
+bc_scree  #2 PCA seems best
+bc_pca.dat = as.data.frame(cbind(bc_pca$x[,1:2], Diagnosis))
+summary(bc_pca) 
+```
+#PC3 covers 0.94795%
+
+
+
+#####lets draw a 3-dim plot & PCA1~PCA3
+```{r}
+library(dplyr)
+library(gt)
+library(tourr)
+
+bc_pca$rotation[,1:2] %>%
+  as_tibble(rownames="Variable") %>% 
+  arrange(desc(PC1), desc(PC2)) %>%
+  gt() %>%
+  fmt_number(columns = c(PC1, PC2),
+             decimals = 2)
+
+animate(bc_pca$x[,1:2],
+        tour_path = grand_tour(), 
+        display=display_xy(cex=1))
+
+animate_xy(bc_pca$x[,1:3], col=Diagnosis, half_range=100)
+```
+#B(양성, blue) seems to have more outliers than M(악성)
+#since B has 1.7 times more data, the results are as follows.
+
+
+####compare with original data
+```{r}
+animate_xy(bc.final[,-c(1:2)], col=Diagnosis, cex=1, 
+           half_range=40, tour_path=grand_tour())
+```
+
+```{r}
+ggplot(bc_pca.dat, aes(PC1, PC2, col=as.factor(Diagnosis))) + geom_point() + scale_color_discrete(name="Diagnosis",breaks=c(1,2),labels = c("B(양성)","M(악성)")) + ggtitle("PCA Results")
+
+
+
+ggplot(bc_pca.dat, aes(PC1, fill=as.factor(Diagnosis), alpha=0.5)) + geom_density() + scale_color_discrete(name="Diagnosis",breaks=c(1,2),labels = c("B(양성)","M(악성)")) + ggtitle("PC1 Density")
+
+
+ggplot(bc_pca.dat, aes(PC2, fill=as.factor(Diagnosis), alpha=0.5)) + geom_density() + scale_color_discrete(name="Diagnosis",breaks=c(1,2),labels = c("B(양성)","M(악성)")) + ggtitle("PC2 Density")
+```
+
+```{r}
+library(GGally)
+
+ggpairs(bc_pca.dat, columns=1:3, 
+        aes(color=as.factor(Diagnosis), alpha=0.5))
+```
+#B(양성, red)=1, M(악성, blue)=2
+#PC1 does have big variance, but lot of it is due to the outliers.
+#it seems that PC2 and PC3 has better plot than PC1
+
+
+
+####################################################################
+#       LDA (with PCA results)
+####################################################################
+```{r}
+library(MASS)
+
+bc_lda = lda(Diagnosis ~ PC1 + PC2 ,data = bc_pca.dat,
+             prior=c(1/2, 1/2))
+options(digits=2)
+bc_lda
+
+bc_lda$scaling
+
+bc_lda_pred = predict(bc_lda, bc_pca.dat)
+bc_lda_pred$class  #1:B, 2:M
+```
+
+###오분류율
+```{r}
+table(ifelse(bc_lda_pred$class==1,"B", "M"), Diagnosis)
+mean(ifelse(bc_lda_pred$class==1,"B", "M")!= Diagnosis)
+```
+#오분류율: 0.077
+
+
+```{r}
+ldahist(bc_lda_pred$x, g=bc_lda_pred$class)
+bc_pca.dat$pred =bc_lda_pred$class
+bc_pca.dat$miss = bc_lda_pred$class != as.factor(ifelse(bc_d$Diagnosis=="B",1,2))
+
+sum(bc_pca.dat$miss)
+```
+#44 miss
+
+
+
+```{r}
+colnames(bc.final) =c("ID", "Diagnosis", "Radius_std", "Texture_std", "Parameter_std", "Area_std", "Smoothness_std","Compactness_std", "Concavity_std", "Concave_points_std", "Symmetry_std", "Fraction_dimension_std","Radius_w_Std", "Texture_w_Std", "Parameter_w_Std", "Area_w_Std", "Smoothness_w_Std","Compactness_w_Std", "Concavity_w_Std", "Concave_points_w_Std", "Symmetry_w_Std", "Fraction_dimension_w_Std")
+a=ggplot(bc.final[which(bc_pca.dat$miss),], aes(Radius_std, fill=Diagnosis, alpha=0.5)) + geom_density()
+
+b=ggplot(bc.final[which(bc_pca.dat$miss),], aes(Texture_std, fill=Diagnosis, alpha=0.5)) + geom_density()
+
+c=ggplot(bc.final[which(bc_pca.dat$miss),], aes(Parameter_std, fill=Diagnosis, alpha=0.5)) + geom_density()
+
+d=ggplot(bc.final[which(bc_pca.dat$miss),], aes(Area_std, fill=Diagnosis, alpha=0.5)) + geom_density()
+
+e=ggplot(bc.final[which(bc_pca.dat$miss),], aes(Smoothness_std, fill=Diagnosis, alpha=0.5)) + geom_density()
+
+f=ggplot(bc.final[which(bc_pca.dat$miss),], aes(Compactness_std, fill=Diagnosis, alpha=0.5)) + geom_density()
+
+g=ggplot(bc.final[which(bc_pca.dat$miss),], aes(Concavity_std, fill=Diagnosis, alpha=0.5)) + geom_density()
+
+h=ggplot(bc.final[which(bc_pca.dat$miss),], aes(Concave_points_std, fill=Diagnosis, alpha=0.5)) + geom_density()
+
+i=ggplot(bc.final[which(bc_pca.dat$miss),], aes(Symmetry_std, fill=Diagnosis, alpha=0.5)) + geom_density()
+
+j=ggplot(bc.final[which(bc_pca.dat$miss),], aes(Fraction_dimension_std, fill=Diagnosis, alpha=0.5)) + geom_density()
+
+
+grid.arrange(a,b,c,d,e,f,g,h,i,j,ncol=3,nrow=4)
+
+
+a=ggplot(bc.final[which(bc_pca.dat$miss),], aes(Radius_w_Std, fill=Diagnosis, alpha=0.5)) + geom_density()
+
+b=ggplot(bc.final[which(bc_pca.dat$miss),], aes(Texture_w_Std, fill=Diagnosis, alpha=0.5)) + geom_density()
+
+c=ggplot(bc.final[which(bc_pca.dat$miss),], aes(Parameter_w_Std, fill=Diagnosis, alpha=0.5)) + geom_density()
+
+d=ggplot(bc.final[which(bc_pca.dat$miss),], aes(Area_w_Std, fill=Diagnosis, alpha=0.5)) + geom_density()
+
+e=ggplot(bc.final[which(bc_pca.dat$miss),], aes(Smoothness_w_Std, fill=Diagnosis, alpha=0.5)) + geom_density()
+
+f=ggplot(bc.final[which(bc_pca.dat$miss),], aes(Compactness_w_Std, fill=Diagnosis, alpha=0.5)) + geom_density()
+
+g=ggplot(bc.final[which(bc_pca.dat$miss),], aes(Concavity_w_Std, fill=Diagnosis, alpha=0.5)) + geom_density()
+
+h=ggplot(bc.final[which(bc_pca.dat$miss),], aes(Concave_points_w_Std, fill=Diagnosis, alpha=0.5)) + geom_density()
+
+i=ggplot(bc.final[which(bc_pca.dat$miss),], aes(Symmetry_w_Std, fill=Diagnosis, alpha=0.5)) + geom_density()
+
+j=ggplot(bc.final[which(bc_pca.dat$miss),], aes(Fraction_dimension_w_Std, fill=Diagnosis, alpha=0.5)) + geom_density()
+
+
+grid.arrange(a,b,c,d,e,f,g,h,i,j,ncol=3,nrow=4)
+
+
+
+bc.final[which(bc_lda_org.pred$miss),]
+
+```
+
+
+
+######## LDA plot between PC1 & PC2
+```{r}
+ggplot(bc_pca.dat, aes(PC1, PC2))+
+    #missing ones are in red dot
+  geom_point(aes(color=factor(Diagnosis))) +geom_point(data = bc_pca.dat[bc_pca.dat$miss,],
+             col="black",size= 1) + scale_color_discrete(name="Diagnosis",breaks=c(1,2),labels = c("B(양성)","M(악성)")) + ggtitle("LDA Results in PCA Dataset")
+```
+#the actual(original) classificaiton
+
+
+###### LDA plot between PC1 & PC3
+```{r}
+ggplot(bc_pca.dat, aes(PC1, PC3))+
+  geom_point(aes(color=factor(Diagnosis)))+
+  geom_point(data = bc_pca.dat[bc_pca.dat$miss,],
+             col="red",size= 1) #missing ones are in red dot
+```
+#the actual(original) classificaiton
+
+
+
+```{r}
+ggplot(bc_pca.dat, aes(PC2, PC3))+
+  geom_point(aes(color=factor(Diagnosis)))  +
+  geom_point(data = bc_pca.dat[bc_pca.dat$miss,],
+             col="red",size= 1)
+```
+#the actual(original) classificaiton
+
+
+
+##3d plot
+```{r}
+animate_xy(bc_pca$x[,1:3], col=bc_lda_pred$class,
+           half_range=100)
+
+```
+#why does it look linear?
+
+
+#compare with original coloring(original diagnosis)
+```{r}
+animate_xy(bc_pca$x[,1:3], col=Diagnosis,
+           half_range=100)
+```
+
+
+
+#####################################################################
+#       LDA (with original data)
+##################################################################
+```{r}
+bc_lda_org = lda(Diagnosis~., data=bc.final[,-1],
+                 prior=c(1/2, 1/2))
+
+options(digits=2)
+
+bc_lda_org.pred = predict(bc_lda_org, bc.final[,-1])
+bc_lda_org.pred$class  #1:B, 2:M
+```
+
+####오분류율
+```{r}
+table(bc_lda_org.pred$class, bc.final$Diagnosis)
+mean(bc_lda_org.pred$class !=bc.final$Diagnosis)
+#0.03 
+
+
+
+ldahist(bc_lda_org.pred$x, g=bc.final$Diagnosis)
+```
+
+
+####### 3d Plot
+```{r}
+bc_lda_org.pred$miss = bc_lda_org.pred$class  != Diagnosis
+sum(bc_lda_org.pred$miss)/nrow(bc_d)#오분류율
+
+bc_lda_org.pred$class = as.character(bc_lda_org.pred$class)
+bc_lda_org.pred$class[which(bc_lda_org.pred$miss)] = 'C'
+bc_lda_org.pred$class = as.factor(bc_lda_org.pred$class)
+animate_xy(bc.final[,-c(1:2)], col=bc_lda_org.pred$class,
+           half_range=40) 
+
+```
+
+
+
+####################################################################
+#       T-sne
+####################################################################
+```{r}
+library(liminal)
+library(Rtsne)
+library(umap)
+tsne = Rtsne::Rtsne(bc.final[,-c(1:2)],perplexity=80)
+tsne_df = data.frame(tsneX=tsne$Y[,1],
+                     tsneY=tsne$Y[,2])
+par(mfrow=c(1,2))
+plot(tsne_df, col=Diagnosis, 
+     pch=20, cex=1,main="original data의 tsne") + theme_minimal()
+```
+
+
+
+```{r}
+tsne.pca = Rtsne(bc_pca.dat[,1:2], perplexity=80)
+tsne.pca_df = data.frame(tsneX=tsne.pca$Y[,1],
+                         tsneY=tsne.pca$Y[,2])
+plot(tsne.pca_df, col=Diagnosis, 
+     pch=20, cex=1,main="PCA data의 tsne") + theme_minimal()
+```
+
+
+######## 1. model based clustering ##########
+```{r}
+library(mclust)
+bc_BIC = mclustBIC(tsne_df) 
+ggmcbic(bc_BIC, cl=2:9, top=7) + theme_minimal()
+
+##4 cluster(VEV)
+bc_mc = Mclust(tsne_df, G=4, modelNames = "VEV")  
+bc_mce = mc_ellipse(bc_mc)
+bc_cl = as.data.frame(tsne_df)
+bc_cl$cl = factor(bc_mc$classification)
+head(bc_cl) 
+
+
+##6 cluster(EVI)
+bc_mc = Mclust(tsne_df, G=6, modelNames = "EVI")  
+bc_mce = mc_ellipse(bc_mc)
+bc_cl = as.data.frame(tsne_df)
+bc_cl$cl = factor(bc_mc$classification)
+head(bc_cl) 
+
+```
+
+
+```{r}
+bc_mc_data = bc_cl %>% 
+  mutate(type='data') %>% 
+  bind_rows(bind_cols(bc_mce$ell,
+                      type=rep("ellipse",nrow(bc_mce$ell)))) %>% 
+  mutate(type=factor(type))
+
+head(bc_mc_data) #penguins1 data + clustering index + type
+
+plot(bc_mc_data$tsneY~bc_mc_data$tsneX, col=bc_mc_data$cl, main="Original Data clustering (k=6, model=EVI)")
+```
+
+
+###pca data
+
+```{r}
+library(mclust)
+bc_BIC = mclustBIC(tsne.pca_df) 
+ggmcbic(bc_BIC, cl=2:9, top=7) + theme_minimal()
+
+bc_mc = Mclust(tsne.pca_df, G=5, modelNames = "EEE")  
+bc_mce = mc_ellipse(bc_mc)
+bc_cl = as.data.frame(tsne.pca_df)
+bc_cl$cl = factor(bc_mc$classification)
+head(bc_cl) 
+```
+
+```{r}
+bc_mc_data = bc_cl %>% 
+  mutate(type='data') %>% 
+  bind_rows(bind_cols(bc_mce$ell,
+                      type=rep("ellipse",nrow(bc_mce$ell)))) %>% 
+  mutate(type=factor(type))
+
+head(bc_mc_data) #penguins1 data + clustering index + type
+
+plot(bc_mc_data$tsneY~bc_mc_data$tsneX, col=bc_mc_data$cl, main="PCA clustering (k=5, model=EVV)")
+```
+
+
+
+
+
+###T-sne
+```{r}
+library(mclust)
+bc_BIC = mclustBIC(tsne.pca_df) 
+ggmcbic(bc_BIC, cl=2:9, top=7) + theme_minimal()
+
+bc_mc = Mclust(tsne.pca_df, G=5, modelNames = "EEE")  
+bc_mce = mc_ellipse(bc_mc)
+bc_cl = as.data.frame(tsne.pca_df)
+bc_cl$cl = factor(bc_mc$classification)
+head(bc_cl) 
+```
+
+```{r}
+bc_mc_data = bc_cl %>% 
+  mutate(type='data') %>% 
+  bind_rows(bind_cols(bc_mce$ell,
+                      type=rep("ellipse",nrow(bc_mce$ell)))) %>% 
+  mutate(type=factor(type))
+
+head(bc_mc_data) #penguins1 data + clustering index + type
+
+plot(bc_mc_data$tsneY~bc_mc_data$tsneX, col=bc_mc_data$cl, main="PCA clustering (k=5, model=EVV)")
+```
+
+
+#compare with
+```{r}
+plot(tsne.pca_df, col=Diagnosis, 
+     pch=20, cex=1) + theme_minimal()
+```
+
+
+###좀 더 단순한 모형
+```{r}
+bc_mc = Mclust(tsne.pca_df, G=3, modelNames = "EVV")  
+bc_mce = mc_ellipse(bc_mc)
+bc_cl = as.data.frame(tsne.pca_df)
+bc_cl$cl = factor(bc_mc$classification)
+
+bc_mc_data = bc_cl %>% 
+  mutate(type='data') %>% 
+  bind_rows(bind_cols(bc_mce$ell,
+                      type=rep("ellipse",nrow(bc_mce$ell)))) %>% 
+  mutate(type=factor(type))
+
+plot(bc_mc_data$tsneY~bc_mc_data$tsneX, col=bc_mc_data$cl)
+```
+#Much simple with 3 clusters.
+
+
+
+######## 2. k-means ##########
+##k=2
+```{r}
+bc_km = kmeans(tsne.pca_df, centers=2,
+              iter.max = 50, nstart = 5)
+
+bc_km_means = data.frame(bc_km$centers) %>%
+  mutate(cl = factor(rownames(bc_km$centers)))
+
+bc_km_d = as.data.frame(tsne.pca_df) %>% mutate(cl = factor(bc_km$cluster))
+head(bc_km_d)
+
+bc_km_means = bc_km_means %>% mutate(type = "mean"); head(bc_km_means)
+bc_km_d = bc_km_d %>% mutate(type = "data"); head(bc_km_d)
+
+
+bc_km_all = bind_rows(bc_km_means, bc_km_d)
+bc_km_all$type = factor(bc_km_all$type, levels=c("mean", "data"))
+bc_pch = c(3, 20)[as.numeric(bc_km_all$type)]
+bc_cex = c(3, 1)[as.numeric(bc_km_all$type)]
+
+par(mfrow=c(2,2))
+plot(bc_km_all$tsneY~bc_km_all$tsneX, col=bc_km_all$cl,
+     pch = bc_pch, cex=bc_cex, main="PCA tsne k-means cluster")
+```
+
+##k=3
+```{r}
+bc_km = kmeans(tsne.pca_df, centers=3,
+              iter.max = 50, nstart = 5)
+
+bc_km_means = data.frame(bc_km$centers) %>%
+  mutate(cl = factor(rownames(bc_km$centers)))
+
+bc_km_d = as.data.frame(tsne.pca_df) %>% mutate(cl = factor(bc_km$cluster))
+head(bc_km_d)
+
+bc_km_means = bc_km_means %>% mutate(type = "mean"); head(bc_km_means)
+bc_km_d = bc_km_d %>% mutate(type = "data"); head(bc_km_d)
+
+
+bc_km_all = bind_rows(bc_km_means, bc_km_d)
+bc_km_all$type = factor(bc_km_all$type, levels=c("mean", "data"))
+bc_pch = c(3, 20)[as.numeric(bc_km_all$type)]
+bc_cex = c(3, 1)[as.numeric(bc_km_all$type)]
+
+
+plot(bc_km_all$tsneY~bc_km_all$tsneX, col=bc_km_all$cl,
+     pch = bc_pch, cex=bc_cex, main="PCA tsne k-means cluster")
+```
+#there seems to be some outliers or misclassification going on.
+
+
+
+
+##k=5
+```{r}
+bc_km = kmeans(tsne.pca_df, centers=5,
+               iter.max = 50, nstart = 5)
+
+bc_km_means = data.frame(bc_km$centers) %>%
+  mutate(cl = factor(rownames(bc_km$centers)))
+
+bc_km_d = as.data.frame(tsne.pca_df) %>% mutate(cl = factor(bc_km$cluster))
+head(bc_km_d)
+
+bc_km_means = bc_km_means %>% mutate(type = "mean"); head(bc_km_means)
+bc_km_d = bc_km_d %>% mutate(type = "data"); head(bc_km_d)
+
+
+bc_km_all = bind_rows(bc_km_means, bc_km_d)
+bc_km_all$type = factor(bc_km_all$type, levels=c("mean", "data"))
+bc_pch = c(3, 20)[as.numeric(bc_km_all$type)]
+bc_cex = c(3, 1)[as.numeric(bc_km_all$type)]
+
+
+plot(bc_km_all$tsneY~bc_km_all$tsneX, col=bc_km_all$cl,
+     pch = bc_pch, cex=bc_cex, main="PCA tsne k-means cluster")
+```
+#Worse than k=3
+
+
+
+#compare with original
+```{r}
+plot(tsne.pca_df, col=Diagnosis, 
+     pch=20, cex=1, main="PCA tsne original cluster") + theme_minimal()
+```
+
+
+##############original data
+##k=2
+```{r}
+bc_km = kmeans(tsne_df, centers=2,
+              iter.max = 50, nstart = 5)
+
+bc_km_means = data.frame(bc_km$centers) %>%
+  mutate(cl = factor(rownames(bc_km$centers)))
+
+bc_km_d = as.data.frame(tsne_df) %>% mutate(cl = factor(bc_km$cluster))
+head(bc_km_d)
+
+bc_km_means = bc_km_means %>% mutate(type = "mean"); head(bc_km_means)
+bc_km_d = bc_km_d %>% mutate(type = "data"); head(bc_km_d)
+
+
+bc_km_all = bind_rows(bc_km_means, bc_km_d)
+bc_km_all$type = factor(bc_km_all$type, levels=c("mean", "data"))
+bc_pch = c(3, 20)[as.numeric(bc_km_all$type)]
+bc_cex = c(3, 1)[as.numeric(bc_km_all$type)]
+
+par(mfrow=c(2,2))
+plot(bc_km_all$tsneY~bc_km_all$tsneX, col=bc_km_all$cl,
+     pch = bc_pch, cex=bc_cex, main="Original tsne k-means cluster")
+```
+
+##k=4
+```{r}
+bc_km = kmeans(tsne_df, centers=4,
+              iter.max = 50, nstart = 5)
+
+bc_km_means = data.frame(bc_km$centers) %>%
+  mutate(cl = factor(rownames(bc_km$centers)))
+
+bc_km_d = as.data.frame(tsne_df) %>% mutate(cl = factor(bc_km$cluster))
+head(bc_km_d)
+
+bc_km_means = bc_km_means %>% mutate(type = "mean"); head(bc_km_means)
+bc_km_d = bc_km_d %>% mutate(type = "data"); head(bc_km_d)
+
+
+bc_km_all = bind_rows(bc_km_means, bc_km_d)
+bc_km_all$type = factor(bc_km_all$type, levels=c("mean", "data"))
+bc_pch = c(3, 20)[as.numeric(bc_km_all$type)]
+bc_cex = c(3, 1)[as.numeric(bc_km_all$type)]
+
+
+plot(bc_km_all$tsneY~bc_km_all$tsneX, col=bc_km_all$cl,
+     pch = bc_pch, cex=bc_cex, main="Original tsne k-means cluster")
+```
+#there seems to be some outliers or misclassification going on.
+
+
+
+
+##k=6
+```{r}
+bc_km = kmeans(tsne_df, centers=6,
+               iter.max = 50, nstart = 5)
+
+bc_km_means = data.frame(bc_km$centers) %>%
+  mutate(cl = factor(rownames(bc_km$centers)))
+
+bc_km_d = as.data.frame(tsne_df) %>% mutate(cl = factor(bc_km$cluster))
+head(bc_km_d)
+
+bc_km_means = bc_km_means %>% mutate(type = "mean"); head(bc_km_means)
+bc_km_d = bc_km_d %>% mutate(type = "data"); head(bc_km_d)
+
+
+bc_km_all = bind_rows(bc_km_means, bc_km_d)
+bc_km_all$type = factor(bc_km_all$type, levels=c("mean", "data"))
+bc_pch = c(3, 20)[as.numeric(bc_km_all$type)]
+bc_cex = c(3, 1)[as.numeric(bc_km_all$type)]
+
+
+plot(bc_km_all$tsneY~bc_km_all$tsneX, col=bc_km_all$cl,
+     pch = bc_pch, cex=bc_cex, main="Original tsne k-means cluster")
+```
+#Worse than k=3
+
+
+
+#compare with original
+```{r}
+plot(tsne_df, col=Diagnosis, 
+     pch=20, cex=1, main="Original tsne original cluster") + theme_minimal()
+```
+
+
+
+
+
+
+
+
+
+################# 3. Hierarchical Clustering
+```{r}
+library(ggdendro)
+bc_dist = dist(tsne.pca_df)
+bc_hcw = hclust(bc_dist, method="ward.D2")
+
+###k=3
+bc_clw = as.data.frame(tsne.pca_df) %>%   
+  mutate(cl = factor(cutree(bc_hcw, 5))) %>%
+  as.data.frame()
+
+bc_w_hfly = hierfly(bc_clw, bc_hcw, scale=TRUE)
+
+bc_hcw_dd = dendro_data(bc_hcw)
+bc_hcw_dd
+```
+
+#plot
+```{r}
+ggplot() + geom_segment(data=bc_hcw_dd$segments,
+                        aes(x = x, y = y,
+                            xend = xend, yend = yend)) +
+  geom_point(data=bc_hcw_dd$labels, aes(x=x, y=y),
+             alpha=0.8) +
+  theme_dendro()
+```
+#the dendrogram seems quite balanced 
+#there seems to be two main clusters
+
+
+
+```{r}
+glyps=c(16,46)
+
+pchw=glyps[bc_w_hfly$data$node+1]
+
+colw=bc_w_hfly$data$cl
+colw=as.factor(colw); colw
+plot(bc_w_hfly$data$tsneY~bc_w_hfly$data$tsneX,
+     col=colw, pch=pchw, main="original t-sne hierarchical clustering")
+
+```
+
+###k=5
+```{r}
+bc_clw = as.data.frame(tsne.pca_df) %>%   
+  mutate(cl = factor(cutree(bc_hcw, 2))) %>%
+  as.data.frame()
+
+bc_w_hfly = hierfly(bc_clw, bc_hcw, scale=TRUE)
+
+bc_hcw_dd = dendro_data(bc_hcw)
+```
+
+#plot
+```{r}
+ggplot() + geom_segment(data=bc_hcw_dd$segments,
+                        aes(x = x, y = y,
+                            xend = xend, yend = yend)) +
+  geom_point(data=bc_hcw_dd$labels, aes(x=x, y=y),
+             alpha=0.8) +
+  theme_dendro()
+```
+#the dendrogram seems quite balanced 
+#there seems to be two main clusters
+
+```{r}
+glyps=c(16,46)
+
+pchw=glyps[bc_w_hfly$data$node+1]
+
+colw=bc_w_hfly$data$cl
+colw=as.factor(colw); colw
+plot(bc_w_hfly$data$tsneY~bc_w_hfly$data$tsneX,
+     col=colw, pch=pchw, main="PCA t-sne hierarchical clustering")
+```
+
+
+
+###k=2
+```{r}
+bc_clw = as.data.frame(tsne.pca_df) %>%   #b/c penguins1 is a scale data
+  mutate(cl = factor(cutree(bc_hcw, 2))) %>%
+  as.data.frame()
+
+bc_w_hfly = hierfly(bc_clw, bc_hcw, scale=TRUE)
+
+bc_hcw_dd = dendro_data(bc_hcw)
+
+
+#plot
+ggplot() + geom_segment(data=bc_hcw_dd$segments,
+                        aes(x = x, y = y,
+                            xend = xend, yend = yend)) +
+  geom_point(data=bc_hcw_dd$labels, aes(x=x, y=y),
+             alpha=0.8) +
+  theme_dendro()
+```
+#the dendrogram seems quite balanced 
+#there seems to be two main clusters
+
+```{r}
+glyps=c(16,46)
+
+pchw=glyps[bc_w_hfly$data$node+1]
+
+colw=bc_w_hfly$data$cl
+colw=as.factor(colw); colw
+plot(bc_w_hfly$data$tsneY~bc_w_hfly$data$tsneX,
+     col=colw, pch=pchw, main="PCA t-sne hierarchical clustering")
+```
+#reverse clustering
+#the lda seems easier to find
+
+#compare with original
+```{r}
+plot(tsne.pca_df, col=Diagnosis, 
+     pch=20, cex=1, main="PCA tsne original cluster") + theme_minimal()
+```
+
+
+
+#######################################################################
+#             Tree
+#######################################################################
+```{R}
+ggpairs(bc.final[,3:12])
+ggpairs(bc.final[,13:22])
+```
+#since certain variables have high correlation (ex. radius and parameter), tree results might not be great .
+
+
+```{r}
+library(rpart); library(rpart.plot) 
+ctrl = list(cp = 0, minbucket = 5, maxdepth = 8)
+fit = rpart(Diagnosis ~ ., data = bc.final[,-1], control = ctrl)
+# plot tree
+rpart.plot(fit)
+```
+
+
+
+```{r}
+library(rsample)
+split  = initial_split( bc.final[,-1], prop = 0.7, strata = "Diagnosis")
+bc_train = training(split)
+bc_dt1 = rpart(
+  formula = as.factor(Diagnosis) ~ .,
+  data = bc.final[,-1],
+  method = "class")
+bc_dt1
+rpart.plot(bc_dt1)
+plotcp(bc_dt1)
+```
+#cp=3 seems best
+
+
+```{r}
+library(rpart); library(rpart.plot) 
+ctrl = list(cp = 0.042,  mindepth = 4)
+fit = rpart(Diagnosis ~ ., data = bc.final[,-1])
+fit2=prune(fit,cp = 0.042, best=4)
+# plot tree
+plot(fit2); text(fit2, pretty=0)
+```
+
+
+
+
+
+
+
+```{r}
+library(caret) 
+bc_dt3 = train(
+  as.factor(Diagnosis) ~ .,
+  data = bc.final[,-1], 
+  method = "rpart",
+  trControl = trainControl(method = "cv", number = 10),
+  tuneLength = 20
+)
+
+ggplot(bc_dt3)
+```
+
+
+```{r}
+library(vip)
+vip::vip(bc_dt3, num_features = 40, bar = FALSE)
+```
+#areaa=ggplot(bc.final[which(bc_pca.dat$miss),], aes(Radius_std, fill=Diagnosis, alpha=0.5)) + geom_density()
+(worst), radius_std(worst), parameter_std(worst),
+#concave_points_std, concave_points_std(worst) seemss the most important!
+
+
+```{r}
+ctrl = trainControl(method="cv", number=10, classProbs=TRUE,
+             summaryFunction=twoClassSummary)
+
+svm_auc = train(Diagnosis~., data=bc_train, method="svmRadial",
+                preProcess=c("center","scale"),
+                metric="ROC",
+                trControl = ctrl, tuneLength=10)
+
+prob_yes <- function(object, newdata) {
+ predict(object, newdata = newdata, type = "prob")[, "Yes"]
+}
+vip(svm_auc, method = "permute", nsim = 5, train = bc_train,
+ target = "Diagnosis", metric = "roc_auc", reference_class = "Yes",pred_wrapper = prob_yes, event_level = "second")
+
+```
+
+
