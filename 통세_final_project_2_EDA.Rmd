@@ -193,9 +193,6 @@ boxplot(bc_std2, main="boxplot of Std. Method 2")
 cov(bc_std2[,1:10])
 ```
 
-###Question: 어떤 std를 선택해야 할지 모르겠음. 
-#현재 판단으로는 std2가 더 나아보임.
-
 
 ######################## Worst ###########################
 ```{r}
@@ -209,8 +206,6 @@ summary(bc_std)
 bc.wst_std = as.matrix(scale(bc_d[,23:32]))
 head(bc.wst_std)
 ```
-#very different from bc_std...
-#What should we do?!?!?! 차라리 s.e.를 적용하는 것이 좋을듯.
 
 ```{r}
 bc.wst_std = c()
@@ -558,7 +553,6 @@ animate_xy(bc_pca$x[,1:3], col=bc_lda_pred$class,
            half_range=100)
 
 ```
-#why does it look linear?
 
 
 #compare with original coloring(original diagnosis)
@@ -735,7 +729,7 @@ plot(tsne.pca_df, col=Diagnosis,
 ```
 
 
-###좀 더 단순한 모형
+###Simpler Model
 ```{r}
 bc_mc = Mclust(tsne.pca_df, G=3, modelNames = "EVV")  
 bc_mce = mc_ellipse(bc_mc)
@@ -1131,7 +1125,7 @@ ggplot(bc_dt3)
 library(vip)
 vip::vip(bc_dt3, num_features = 40, bar = FALSE)
 ```
-#areaa=ggplot(bc.final[which(bc_pca.dat$miss),], aes(Radius_std, fill=Diagnosis, alpha=0.5)) + geom_density()
+#areaa = ggplot(bc.final[which(bc_pca.dat$miss),], aes(Radius_std, fill=Diagnosis, alpha=0.5)) + geom_density()
 (worst), radius_std(worst), parameter_std(worst),
 #concave_points_std, concave_points_std(worst) seemss the most important!
 
@@ -1145,7 +1139,7 @@ svm_auc = train(Diagnosis~., data=bc_train, method="svmRadial",
                 metric="ROC",
                 trControl = ctrl, tuneLength=10)
 
-prob_yes <- function(object, newdata) {
+prob_yes = function(object, newdata) {
  predict(object, newdata = newdata, type = "prob")[, "Yes"]
 }
 vip(svm_auc, method = "permute", nsim = 5, train = bc_train,
