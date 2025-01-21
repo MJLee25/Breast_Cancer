@@ -1,0 +1,275 @@
+---
+output:
+  word_document: default
+  html_document: default
+---
+##women breast cancer: diagnostic
+```{r}
+bc_d=read.csv("C:/Temp/data/wisconson/wdbc.data", 
+              header=TRUE)
+
+dim(bc_d)
+
+head(bc_d)
+
+colnames(bc_d) = c("ID", "Diagnosis", 
+                   "Radius_mean", "Texture_mean", "Parameter_mean", "Area_mean", "Smoothness_mean",
+                   "Compactness_mean", "Concavity_mean", "Concave_points_mean", "Symmetry_mean", "Fraction_dimension_mean",
+                   "Radius_se", "Texture_se", "Parameter_se", "Area_se", "Smoothness_se",
+                   "Compactness_se", "Concavity_se", "Concave_points_se", "Symmetry_se", "Fraction_dimension_se",
+                   "Radius_worst", "Texture_worst", "Parameter_worst", "Area_worst", "Smoothness_worst",
+                   "Compactness_worst", "Concavity_worst", "Concave_points_worst", "Symmetry_worst", "Fraction_dimension_worst")
+
+head(bc_d)
+#diagnosis: M(악성), B(양성)
+bc_d$Diagnosis = as.factor(bc_d$Diagnosis)
+```
+
+##################################################################
+#                 EDA
+##################################################################
+```{r}
+sum(is.na(bc_d))
+```
+#no missing values
+
+#data filtering
+```{r}
+str(bc_d)
+table(bc_d$Diagnosis)
+```
+
+####################################################################
+#       PCA
+####################################################################
+```{r}
+bcX = bc_d[,-c(1,2)]
+head(bcX)
+
+bcX.sc = as.matrix(scale(bcX))
+```
+
+
+#original class
+```{r}
+p_col = bc_d$Diagnosis
+p_col
+
+head(data.frame(apply(bcX.sc, 2, function(x) (x-mean(x))/sd(x))))
+head(bcX.sc)
+
+library(mulgar)
+library(ggplot2)
+bc_pca = prcomp(bcX.sc)
+bc_scree = ggscree(bc_pca, q=5) + theme_minimal()
+
+
+summary(bc_pca) 
+```
+#around 3 PCs will cover 72.6%
+
+
+#lets draw a 3-dim plot & PCA1~PCA3
+```{r}
+library(dplyr)
+library(gt)
+library(tourr)
+bc_pca$rotation[,1:3] %>%
+  as_tibble(rownames="Variable") %>% 
+  arrange(desc(PC1), desc(PC2), desc(PC3)) %>%
+  gt() %>%
+  fmt_number(columns = c(PC1, PC2, PC3),
+             decimals = 2)
+
+animate(bc_pca$x[,1:3],
+           tour_path = grand_tour(), 
+           display=display_xy(cex=1))
+```
+#a few outliers appear
+
+
+```{r}
+animate_xy(bc_pca$x[,1:3], col=p_col)
+```
+#the projection seems well done, since we can distinguish the two different diagnosis status.
+#It seems that the two diagnosis do seem very close, in some viewpoint they can be separated.
+#maybe we can use the LDA/QDA?
+
+
+##compare with original data
+```{r}
+animate_xy(bcX.sc, col=p_col, cex=1, 
+           tour_path=grand_tour())
+```
+
+
+library(GGally)
+```{r}
+bc_pca.dat = as.matrix(cbind(bc_pca$x[,1:3], p_col))
+bc_pca.dat = transform(bc_pca.dat, PC1 = as.numeric(PC1))
+bc_pca.dat = transform(bc_pca.dat, PC2 = as.numeric(PC2))
+bc_pca.dat = transform(bc_pca.dat, PC3 = as.numeric(PC3))
+bc_pca.dat$p_col = as.factor(bc_pca.dat$p_col)
+str(bc_pca.dat)
+```
+
+
+```{r}
+library(GGally)
+ggscatmat(bc_pca.dat, columns=1:3, color="p_col")
+```
+#PC1&PC2 has the best clustering
+#PC1&PC3 also has good clustering
+
+
+
+
+####################################################################
+#       LDA (with PCA results)
+####################################################################
+```{r}
+library(MASS)
+table(p_col)  #original data's classification
+
+bc_lda = lda(p_col ~ PC1 + PC2 + PC3 ,data=bc_pca.dat,
+             prior=c(1/2, 1/2))
+options(digits=2)
+bc_lda
+
+bc_lda$scaling
+
+bc_lda_pred = predict(bc_lda, bc_pca.dat)
+bc_lda_pred$class  #1:B, 2:M
+```
+
+
+#오분류율(쫌 쎈데..)
+#p_col = ifelse(p_col=="B", 1,2)
+```{r}
+table(ifelse(bc_lda_pred$class==1,"B", "M"), p_col)
+mean(ifelse(bc_lda_pred$class==1,"B", "M")!= p_col)
+```
+#0.053
+
+```{r}
+ldahist(bc_lda_pred$x, g=bc_lda_pred$class)
+
+bc_pca.dat$pred =bc_lda_pred$class
+bc_pca.dat$miss = bc_lda_pred$class != as.factor(ifelse(bc_d$Diagnosis=="B",1,2))
+
+sum(bc_pca.dat$miss)
+```
+#30개
+
+
+##plot
+```{r}
+ggplot(bc_pca.dat, aes(PC1, PC2))+
+  geom_point(data = bc_pca.dat[bc_pca.dat$miss,],
+             col="red",size= 4)+  #missing ones are in red dot
+  geom_point(aes(color=factor(p_col)))  #the actual(original) classificaiton
+```
+#1 = B, 2 = M
+#the ones in between seem like they have been misclassified
+#It seems that more 2(M=악성종양) have been misclassified than 1.
+#This could be dangerous, as those who have cancer could be classified as if they are fine.
+
+
+```{r}
+ggplot(bc_pca.dat, aes(PC1, PC3))+
+  geom_point(data = bc_pca.dat[bc_pca.dat$miss,],
+             col="red",size= 4)+  #missing ones are in red dot
+  geom_point(aes(color=factor(p_col)))  #the actual(original) classificaiton
+```
+#1 = B, 2 = M
+#The 구분 is not as precise as the first one.
+#There are more 1(B=양성) that have been misclassified as 2
+#This might be a safer model for patients
+
+```{r}
+ggplot(bc_pca.dat, aes(PC2, PC3))+
+  geom_point(data = bc_pca.dat[bc_pca.dat$miss,],
+             col="red",size= 4)+  #missing ones are in red dot
+  geom_point(aes(color=factor(p_col)))  #the actual(original) classificaiton
+```
+#1 = B, 2 = M
+#Bad PCA
+
+
+###3d plot
+```{r}
+animate_xy(bc_pca$x[,1:3], col=bc_lda_pred$class)
+```
+#compare with original coloring
+```{r}
+animate_xy(bc_pca$x[,1:3], col=p_col)
+```
+
+
+
+####################################################################
+#       LDA (with original data)
+####################################################################
+```{r}
+table(p_col)  #original data's classification
+
+bc_lda_org = lda(Diagnosis~., data=bc_d[,-1],
+                 prior=c(1/2, 1/2))
+  
+options(digits=2)
+bc_lda_org
+
+bc_lda_org$scaling
+
+bc_lda_org.pred = predict(bc_lda_org, bc_d[,-1])
+bc_lda_org.pred$class  #1:B, 2:M
+```
+
+#오분류율
+```{r}
+table(bc_lda_org.pred$class, bc_d$Diagnosis)
+mean(bc_lda_org.pred$class !=bc_d$Diagnosis)
+```
+#0.032
+
+
+```{r}
+ldahist(bc_lda_org.pred$x, g=bc_d$Diagnosis)
+
+bc_d$pred =bc_lda_org.pred$class
+bc_d$miss = bc_lda_org.pred$class != bc_d$Diagnosis
+
+sum(bc_d$miss)
+```
+#18개
+
+
+##3d plot
+```{r}
+animate_xy(as.data.frame(bcX.sc), col=bc_d$pred,
+           half_range=8)
+```
+#hard to distinguihs
+
+
+
+
+
+
+####################################################################
+#       T-sne
+####################################################################
+```{r}
+library(liminal)
+library(Rtsne)
+library(umap)
+tsne = Rtsne::Rtsne(bcX.sc,perplexity=80)
+tsne_df = data.frame(tsneX=tsne$Y[,1],
+                     tsneY=tsne$Y[,2])
+
+plot(tsne_df, col=p_col, 
+     pch=20, cex=1) + theme_minimal()
+
+```
+
+
