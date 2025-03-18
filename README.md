@@ -1,4 +1,4 @@
-# Statistical Seminar Final Project
+# Wisconsen Breast Cancer Patient Analysis
 
 ☑️ **Data:** 위슨콘슨 주 유방암 환자들의 유방 상태에 대한 정보를 담은 데이터
 https://archive.ics.uci.edu/dataset/17/breast+cancer+wisconsin+diagnostic
