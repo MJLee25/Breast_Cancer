@@ -11,7 +11,6 @@ bc_d=read.csv("C:/Temp/data/wisconson/wdbc.data",
 dim(bc_d)
 
 head(bc_d)
-
 colnames(bc_d) = c("ID", "Diagnosis", 
                    "Radius_mean", "Texture_mean", "Parameter_mean", "Area_mean", "Smoothness_mean",
                    "Compactness_mean", "Concavity_mean", "Concave_points_mean", "Symmetry_mean", "Fraction_dimension_mean",
